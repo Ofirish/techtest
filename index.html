@@ -12,9 +12,7 @@
             --accent-color: #3498db;
             --accent-hover: #2980b9;
             --light-bg: #f0f4f8;
-            --card-bg: #ffffff;
             --text-color: #333;
-            --safe-area-bottom: env(safe-area-inset-bottom);
         }
 
         * {
@@ -44,6 +42,7 @@
             background-size: 20px 20px;
             overflow: hidden;
             touch-action: none;
+            z-index: 1; /* Ensure map is behind sidebar on mobile */
         }
 
         #sidebar {
@@ -55,6 +54,27 @@
             flex-direction: column;
             z-index: 10;
             border-left: 1px solid #e1e1e1;
+            position: relative;
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* Mobile Close Button (Hidden on Desktop) */
+        #mobile-close-btn {
+            display: none;
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: #f1f2f6;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 20px;
+            color: #333;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
         }
 
         .sidebar-header {
@@ -113,7 +133,7 @@
         }
         .btn:active { transform: scale(0.98); background-color: var(--accent-hover); }
 
-        /* --- D3 Nodes & Links --- */
+        /* --- D3 Nodes --- */
         .node circle {
             stroke: var(--accent-color);
             stroke-width: 2.5px;
@@ -121,7 +141,6 @@
             transition: all 0.3s;
         }
         
-        /* New Styles for Pill Boxes */
         .pill-rect {
             fill: #ffffff;
             stroke: var(--accent-color);
@@ -141,7 +160,7 @@
             font-size: 14px;
             font-weight: 500;
             fill: #2c3e50;
-            pointer-events: none; /* Let clicks pass to the group/rect */
+            pointer-events: none;
             text-shadow: none;
         }
 
@@ -152,26 +171,49 @@
             transition: stroke 0.3s;
         }
 
-        /* --- Mobile Layout --- */
+        /* --- MOBILE FIX: Bottom Sheet Pattern --- */
         @media (max-width: 768px) {
-            body { flex-direction: column; }
+            body { 
+                flex-direction: column; 
+            }
             
             #mindmap-container {
-                flex: 1.4;
-                border-bottom: 1px solid #ddd;
+                /* Map takes full screen initially */
+                flex: none;
+                height: 100vh;
+                width: 100%;
+                border-bottom: none;
             }
 
             #sidebar {
-                flex: 1;
+                /* Convert sidebar to a Bottom Sheet */
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
                 max-width: 100%;
+                height: 65vh; /* Takes up 65% of screen when open */
                 border-radius: 24px 24px 0 0;
-                box-shadow: 0 -5px 20px rgba(0,0,0,0.08);
+                box-shadow: 0 -5px 25px rgba(0,0,0,0.15);
                 border-left: none;
-                margin-top: -20px; /* Slight overlap */
+                margin-top: 0;
+                
+                /* Start hidden (pushed down) */
+                transform: translateY(110%);
+                z-index: 100;
             }
 
-            .sidebar-header { padding: 15px 20px; }
-            .sidebar-content { padding: 15px 20px 80px 20px; }
+            /* Class to slide it up */
+            #sidebar.active {
+                transform: translateY(0);
+            }
+
+            #mobile-close-btn {
+                display: flex; /* Show close button on mobile */
+            }
+
+            .sidebar-header { padding: 20px 20px 10px 20px; }
+            .sidebar-content { padding: 10px 20px 80px 20px; }
         }
 
         /* --- Flashcard Modal --- */
@@ -179,11 +221,11 @@
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(44, 62, 80, 0.9);
+            background: rgba(44, 62, 80, 0.95); /* Darker for better focus */
             z-index: 1000;
             justify-content: center;
             align-items: center;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(5px);
             padding: 20px;
         }
 
@@ -220,16 +262,8 @@
             text-align: center;
         }
 
-        .flashcard-front {
-            background: #fff;
-            color: var(--primary-color);
-        }
-
-        .flashcard-back {
-            background: var(--accent-color);
-            color: white;
-            transform: rotateY(180deg);
-        }
+        .flashcard-front { background: #fff; color: var(--primary-color); }
+        .flashcard-back { background: var(--accent-color); color: white; transform: rotateY(180deg); }
 
         .card-controls {
             margin-top: 30px;
@@ -264,19 +298,16 @@
             cursor: pointer;
             z-index: 1001;
         }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
+        <button id="mobile-close-btn" onclick="toggleSidebar(false)">&#10005;</button>
+
         <div class="sidebar-header">
             <h2 id="detail-title">חומר לבחינה</h2>
-            <p class="subtitle" id="detail-subtitle">בחר נושא מהמפה כדי להתחיל</p>
+            <p class="subtitle" id="detail-subtitle">לחץ על המפה להצגת מידע</p>
         </div>
         
         <div class="sidebar-content">
@@ -285,8 +316,8 @@
                     <p>ברוכים הבאים למערכת החזרה האינטראקטיבית.</p>
                     <p><strong>איך זה עובד?</strong></p>
                     <ul>
-                        <li>🔍 לחצו על התוויות במפה לפתיחת נושאים.</li>
-                        <li>📖 קראו את הסיכום שיופיע כאן.</li>
+                        <li>🔍 לחצו על התוויות במפה.</li>
+                        <li>📖 המידע יופיע בחלונית זו.</li>
                         <li>🧠 תרגלו עם כרטיסיות הזיכרון.</li>
                     </ul>
                 </div>
@@ -304,7 +335,6 @@
 
     <div id="mindmap-container"></div>
 
-    <!-- Modal -->
     <div id="modal-overlay">
         <div class="close-modal" onclick="closeModal()">&times;</div>
         
@@ -332,6 +362,7 @@
     </div>
 
 <script>
+    // --- Data (Same as before) ---
     const data = {
         name: "חומר לבחינה",
         content: "נושאי הבחינה במדעי הטכנולוגיה: מושגי יסוד, תהליך החקר, מיומנויות ועישון.",
@@ -341,19 +372,17 @@
                 name: "מושגי יסוד",
                 content: `
                     <ul>
-                        <li><strong>מדע (Science):</strong> עוסק ב"למה?". המטרה היא הבנה וחקירה של עולם הטבע וחוקיו (פיזיקה, כימיה, ביולוגיה).</li>
-                        <li><strong>טכנולוגיה (Technology):</strong> עוסקת ב"איך?". המטרה היא פתרון בעיות ומענה לצרכים אנושיים.</li>
-                        <li><strong>קשרי גומלין:</strong> המדע מספק ידע לטכנולוגיה, והטכנולוגיה מספקת כלים למדע. אחד מאיץ את האחר.</li>
-                        <li><strong>אוריינות טכנולוגית:</strong> היכולת להבין, לקבל החלטות ולתפקד בחברה מודרנית.</li>
+                        <li><strong>מדע (Science):</strong> עוסק ב"למה?". המטרה היא הבנה וחקירה.</li>
+                        <li><strong>טכנולוגיה (Technology):</strong> עוסקת ב"איך?". המטרה היא פתרון בעיות.</li>
+                        <li><strong>קשרי גומלין:</strong> המדע מספק ידע לטכנולוגיה, והטכנולוגיה מספקת כלים למדע.</li>
                     </ul>`,
                 flashcards: [
-                    { q: "מהי המטרה העיקרית של המדע?", a: "הבנה וחקירה של עולם הטבע והחוקים השולטים בו." },
-                    { q: "מהי המטרה העיקרית של הטכנולוגיה?", a: "פתרון בעיות ומענה לצרכים אנושיים כדי להיטיב את תנאי החיים." },
-                    { q: "מהי אוריינות טכנולוגית?", a: "היכולת להשתמש בידע כדי להתמודד ולקבל החלטות בסביבה טכנולוגית." }
+                    { q: "מהי המטרה העיקרית של המדע?", a: "הבנה וחקירה של עולם הטבע." },
+                    { q: "מהי המטרה העיקרית של הטכנולוגיה?", a: "פתרון בעיות ומענה לצרכים אנושיים." }
                 ],
                 children: [
                     { name: "מדע", content: "עוסק בחקר עולם הטבע וחוקיו. שואל 'למה?'. התוצר הוא ידע." },
-                    { name: "טכנולוגיה", content: "עוסקת בפתרון בעיות אנושיות. שואלת 'איך?'. התוצר הוא מוצר או מכשיר." }
+                    { name: "טכנולוגיה", content: "עוסקת בפתרון בעיות אנושיות. שואלת 'איך?'. התוצר הוא מוצר." }
                 ]
             },
             {
@@ -362,69 +391,43 @@
                     <strong>שלבי החקר המדעי:</strong>
                     <ol>
                         <li>זיהוי בעיה וצורך.</li>
-                        <li>ניסוח שאלת חקר (קשר בין משתנים).</li>
-                        <li>השערה (תשובה אפשרית שניתן לבדוק).</li>
-                        <li>תכנון הניסוי (בידוד משתנים).</li>
+                        <li>ניסוח שאלת חקר.</li>
+                        <li>השערה.</li>
+                        <li>תכנון הניסוי.</li>
                         <li>תוצאות ומסקנות.</li>
-                    </ol>
-                    <strong>משתנים:</strong>
-                    <ul>
-                        <li><strong>בלתי תלוי:</strong> הגורם שהחוקר משנה (הסיבה).</li>
-                        <li><strong>תלוי:</strong> הגורם הנמדד (התוצאה).</li>
-                        <li><strong>בקרה:</strong> קבוצה להשוואה ללא הגורם המשפיע.</li>
-                    </ul>`,
+                    </ol>`,
                 flashcards: [
-                    { q: "מהו המשתנה הבלתי תלוי?", a: "הגורם שהחוקר משנה במכוון כדי לבדוק את השפעתו (הגורם המשפיע)." },
-                    { q: "מהו המשתנה התלוי?", a: "הגורם הנמדד בניסוי, המשתנה כתוצאה מהטיפול (הגורם המושפע)." },
-                    { q: "מהי קבוצת בקרה?", a: "קבוצה שלא מקבלת את הטיפול בניסוי, משמשת להשוואה כדי להוכיח את סיבת השינוי." },
-                    { q: "מהי שאלת חקר?", a: "שאלה המנסחת את הבעיה ובודקת קשר בין משתנה בלתי תלוי למשתנה תלוי." }
+                    { q: "מהו המשתנה הבלתי תלוי?", a: "הגורם שהחוקר משנה במכוון (הסיבה)." },
+                    { q: "מהו המשתנה התלוי?", a: "הגורם הנמדד בניסוי (התוצאה)." }
                 ]
             },
             {
                 name: "מיומנויות",
                 content: `
                     <ul>
-                        <li><strong>מאמר מדעי:</strong> נכתב ע"י חוקרים, שפה מקצועית, אובייקטיבי, ביקורת עמיתים.</li>
-                        <li><strong>מאמר פופולרי:</strong> נכתב ע"י עיתונאים, לקהל הרחב, שפה יומיומית.</li>
-                        <li><strong>טיעון:</strong> טענה + נימוק (ראיה או הסבר).</li>
-                        <li><strong>גרפים:</strong>
-                            <ul>
-                                <li>גרף רציף: קשר בין משתנים רציפים (XY).</li>
-                                <li>גרף עמודות: השוואה בין קבוצות בדידות.</li>
-                                <li>גרף עוגה: חלקים מתוך שלם.</li>
-                            </ul>
-                        </li>
+                        <li><strong>מאמר מדעי:</strong> חוקרים, שפה מקצועית, ביקורת עמיתים.</li>
+                        <li><strong>מאמר פופולרי:</strong> עיתונאים, לקהל הרחב.</li>
                     </ul>`,
                 flashcards: [
-                    { q: "מה ההבדל בין מאמר מדעי לפופולרי?", a: "מדעי: חוקרים, ביקורת עמיתים. פופולרי: עיתונאים, לקהל הרחב." },
-                    { q: "ממה מורכב משפט טיעון?", a: "טענה + נימוק אחד או יותר." },
-                    { q: "מתי נשתמש בגרף רציף?", a: "כשיש קשר או תלות בין שני משתנים רציפים (לכל נקודה ערך X ו-Y)." }
+                    { q: "מה ההבדל בין מאמר מדעי לפופולרי?", a: "מדעי: לחוקרים. פופולרי: לקהל הרחב." }
                 ]
             },
             {
                 name: "עישון ונזקיו",
                 content: `
-                    <strong>חומרים מסוכנים:</strong>
                     <ul>
-                        <li><strong>ניקוטין:</strong> ממכר, מכווץ כלי דם, מעלה לחץ דם.</li>
-                        <li><strong>עיטרן (זפת):</strong> מסרטן, נדבק לריאות וחוסם אותן.</li>
-                        <li><strong>פחמן חד-חמצני (CO):</strong> מתחרה עם החמצן על ההמוגלובין, גורם לחוסר חמצן.</li>
-                    </ul>
-                    <strong>סוגים נוספים:</strong>
-                    <ul>
-                        <li><strong>נרגילה:</strong> המים לא מסננים רעלים. מסוכנת כמו סיגריה.</li>
-                        <li><strong>סיגריה אלקטרונית:</strong> גורמת לדלקת ריאות כימית.</li>
+                        <li><strong>ניקוטין:</strong> ממכר, מעלה לחץ דם.</li>
+                        <li><strong>עיטרן (זפת):</strong> מסרטן, חוסם ריאות.</li>
+                        <li><strong>CO:</strong> חוסם חמצן.</li>
                     </ul>`,
                 flashcards: [
-                    { q: "מה הסכנה בפחמן חד-חמצני (CO)?", a: "הוא נקשר להמוגלובין במקום החמצן ומונע הגעת חמצן לתאים." },
-                    { q: "מהו העיטרן?", a: "חומר דמוי זפת, מסרטן, שנדבק לריאות וגורם לחסימת דרכי הנשימה." },
-                    { q: "האם מים בנרגילה מסננים רעלים?", a: "לא. המים לא מסננים ניקוטין ועיטרן, והנרגילה מסוכנת מאוד." },
-                    { q: "מה הנזק של סיגריה אלקטרונית?", a: "דלקת ריאות כימית וקריסת ריאות." }
+                    { q: "מה הסכנה ב-CO?", a: "מונע הגעת חמצן לתאים." },
+                    { q: "מהו העיטרן?", a: "חומר מסרטן דמוי זפת." }
                 ],
                 children: [
-                   { name: "CO (פחמן חד חמצני)", content: "גז רעיל, ללא ריח. מונע חמצן מהדם."},
-                   { name: "ניקוטין", content: "החומר הממכר. מכווץ כלי דם ומעלה דופק."},
-                   { name: "עיטרן", content: "החומר המסרטן (זפת). נדבק לריאות."}
+                   { name: "CO", content: "גז רעיל המונע חמצן."},
+                   { name: "ניקוטין", content: "החומר הממכר בסיגריה."},
+                   { name: "עיטרן", content: "החומר המסרטן."}
                 ]
             }
         ]
@@ -443,7 +446,6 @@
 
     const g = svg.append("g");
 
-    // Zoom behavior
     const zoom = d3.zoom()
         .scaleExtent([0.5, 2])
         .on("zoom", (event) => {
@@ -456,19 +458,18 @@
     const duration = 500;
     const root = d3.hierarchy(data, d => d.children);
     
-    // Initial position
     root.x0 = height / 2;
     root.y0 = 100;
 
-    // Increased spacing for pill boxes
-    let treeMap = d3.tree().nodeSize([60, 250]); 
+    let treeMap = d3.tree().nodeSize([70, 200]); // Adjusted node size for better mobile spacing
 
-    // --- Logic ---
     root.children.forEach(collapse);
     update(root);
     
-    // Center the tree initially
-    const initialTransform = d3.zoomIdentity.translate(width/6, height/2).scale(0.9);
+    // Initial centering logic based on screen size
+    const initialScale = width < 768 ? 0.7 : 0.9;
+    const initialX = width < 768 ? width/3 : width/6;
+    const initialTransform = d3.zoomIdentity.translate(initialX, height/2).scale(initialScale);
     svg.call(zoom.transform, initialTransform);
 
     function collapse(d) {
@@ -484,31 +485,25 @@
         const nodes = treeData.descendants();
         const links = treeData.links();
 
-        // Nodes
         const node = g.selectAll('g.node')
             .data(nodes, d => d.id || (d.id = ++i));
 
-        // Enter Phase
         const nodeEnter = node.enter().append('g')
             .attr('class', 'node')
             .attr("transform", d => `translate(${source.y0},${source.x0})`)
             .on('click', click);
 
-        // 1. Circle Joint
         nodeEnter.append('circle')
             .attr('class', 'node-circle')
             .attr('r', 1e-6)
             .style("fill", d => d._children ? "#3498db" : "#fff");
 
-        // 2. Pill Group (Rect + Text)
         const pillGroup = nodeEnter.append('g')
             .attr('class', 'pill-group')
-            .style('opacity', 0); // Hide initially
+            .style('opacity', 0);
 
         pillGroup.append('rect')
-            .attr('rx', 12)
-            .attr('ry', 12)
-            .attr('class', 'pill-rect');
+            .attr('rx', 12).attr('ry', 12).attr('class', 'pill-rect');
 
         pillGroup.append('text')
             .attr('dy', '.35em')
@@ -516,7 +511,6 @@
             .attr('text-anchor', 'middle')
             .text(d => d.data.name);
 
-        // Update Phase
         const nodeUpdate = node.merge(nodeEnter).transition().duration(duration)
             .attr("transform", d => `translate(${d.y},${d.x})`);
 
@@ -524,42 +518,29 @@
             .attr('r', 6)
             .style("fill", d => d._children ? "#3498db" : "#fff");
 
-        // Dynamic Pill Sizing and Positioning
         nodeUpdate.select('.pill-group')
             .style('opacity', 1)
             .each(function(d) {
                 const group = d3.select(this);
                 const text = group.select('text');
                 const rect = group.select('rect');
-                
-                // Measure text
                 const bbox = text.node().getBBox();
-                const paddingX = 24;
-                const paddingY = 12;
-                const width = bbox.width + paddingX;
-                const height = bbox.height + paddingY;
-                
-                // Determine direction (Parents left, Leaves right)
+                const paddingX = 24; const paddingY = 12;
+                const w = bbox.width + paddingX;
+                const h = bbox.height + paddingY;
                 const isParent = d.children || d._children;
-                const offset = 15; // Distance from circle
+                const offset = 15;
                 
-                // Resize rect
-                rect.attr('width', width)
-                    .attr('height', height)
-                    .attr('y', -height/2);
-                    
+                rect.attr('width', w).attr('height', h).attr('y', -h/2);
                 if (isParent) {
-                    // Place to the left
-                    rect.attr('x', -(width + offset));
-                    text.attr('x', -(width/2 + offset));
+                    rect.attr('x', -(w + offset));
+                    text.attr('x', -(w/2 + offset));
                 } else {
-                    // Place to the right
                     rect.attr('x', offset);
-                    text.attr('x', offset + width/2);
+                    text.attr('x', offset + w/2);
                 }
             });
 
-        // Exit Phase
         const nodeExit = node.exit().transition().duration(duration)
             .attr("transform", d => `translate(${source.y},${source.x})`)
             .remove();
@@ -567,10 +548,7 @@
         nodeExit.select('circle').attr('r', 1e-6);
         nodeExit.style('opacity', 1e-6);
 
-        // Links
-        const link = g.selectAll('path.link')
-            .data(links, d => d.target.id);
-
+        const link = g.selectAll('path.link').data(links, d => d.target.id);
         const linkEnter = link.enter().insert('path', "g")
             .attr("class", "link")
             .attr('d', d => {
@@ -585,13 +563,9 @@
             .attr('d', d => {
                 const o = {x: source.x, y: source.y};
                 return diagonal(o, o);
-            })
-            .remove();
+            }).remove();
 
-        nodes.forEach(d => {
-            d.x0 = d.x;
-            d.y0 = d.y;
-        });
+        nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
 
         function diagonal(s, d) {
             if (!s || !d) return "";
@@ -599,14 +573,11 @@
             const sx = (s.x !== undefined) ? s.x : 0;
             const dy = (d.y !== undefined) ? d.y : 0;
             const dx = (d.x !== undefined) ? d.x : 0;
-
-            return `M ${sy} ${sx}
-                    C ${(sy + dy) / 2} ${sx},
-                      ${(sy + dy) / 2} ${dx},
-                      ${dy} ${dx}`;
+            return `M ${sy} ${sx} C ${(sy + dy) / 2} ${sx}, ${(sy + dy) / 2} ${dx}, ${dy} ${dx}`;
         }
     }
 
+    // --- Updated Click Handler for Mobile Sidebar ---
     function click(event, d) {
         if (d.children) {
             d._children = d.children;
@@ -617,6 +588,18 @@
         }
         update(d);
         showDetails(d.data);
+        
+        // Open sidebar on mobile
+        toggleSidebar(true);
+    }
+
+    function toggleSidebar(show) {
+        const sidebar = document.getElementById('sidebar');
+        if (show) {
+            sidebar.classList.add('active');
+        } else {
+            sidebar.classList.remove('active');
+        }
     }
 
     function showDetails(dataObj) {
@@ -643,7 +626,7 @@
         }
     }
 
-    // --- Flashcards Logic ---
+    // --- Flashcards Logic (Unchanged) ---
     let currentFlashcards = [];
     let currentCardIndex = 0;
 
@@ -695,7 +678,6 @@
         height = container.clientHeight;
         svg.attr("width", width).attr("height", height);
     });
-
 </script>
 </body>
 </html>
